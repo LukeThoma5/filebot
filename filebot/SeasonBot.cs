@@ -31,7 +31,7 @@ public static class SeasonBot
                     else if (file.Length > 3000_000_000)
                     {
                         Console.WriteLine($"Skipping {file.FullName} file too big");
-                        Console.ReadLine();
+                        // Console.ReadLine();
                         continue;
                     }
                     else
@@ -42,7 +42,7 @@ public static class SeasonBot
                     }
                     
                     Console.WriteLine($"Moving {file.FullName} to {newPath}");
-                    // file.MoveTo(newPath);
+                    file.MoveTo(newPath);
                 }
             }
         }
