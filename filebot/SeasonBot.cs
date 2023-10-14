@@ -1,5 +1,6 @@
 ﻿using System.Collections.Immutable;
 using System.Data.SQLite;
+using System.Reflection.Metadata.Ecma335;
 using Dapper;
 
 public static class SeasonBot
@@ -26,6 +27,12 @@ public static class SeasonBot
                     {
                         var extraName = $"Extra S{seasonNumber:00} - {Guid.NewGuid():N}.{file.Extension}";
                         newPath = Path.Combine(extrasFolder, extraName);
+                    }
+                    else if (file.Length > 3000_000_000)
+                    {
+                        Console.WriteLine($"Skipping {file.FullName} file too big");
+                        Console.ReadLine();
+                        continue;
                     }
                     else
                     {
