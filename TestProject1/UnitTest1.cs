@@ -27,4 +27,11 @@ public class Tests
         var result = NameCleaner.CleanName("Marley & Me");
         Assert.That(result, Is.EqualTo("marleyme"));
     }
+    
+    [Test]
+    public void Test4()
+    {
+        var result = NameCleaner.CleanName("MUMMA_MIA!");
+        Assert.That(result, Is.EqualTo("mummamia"));
+    }
 }
