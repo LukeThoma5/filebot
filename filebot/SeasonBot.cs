@@ -25,7 +25,7 @@ public static class SeasonBot
                     string newPath;
                     if (file.Length < 1000_000_000)
                     {
-                        var extraName = $"Extra S{seasonNumber:00} - {Guid.NewGuid():N}.{file.Extension}";
+                        var extraName = $"Extra S{seasonNumber:00} - {Guid.NewGuid():N}{file.Extension}";
                         newPath = Path.Combine(extrasFolder, extraName);
                     }
                     else if (file.Length > 3000_000_000)
@@ -36,7 +36,7 @@ public static class SeasonBot
                     }
                     else
                     {
-                        var newFileName = $"S{seasonNumber:00}E{episodeNumber:00}.{file.Extension}";   
+                        var newFileName = $"S{seasonNumber:00}E{episodeNumber:00}{file.Extension}";   
                         newPath = Path.Combine(seasonFolder.FullName, newFileName);
                         episodeNumber++;
                     }
