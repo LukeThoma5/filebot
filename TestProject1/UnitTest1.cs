@@ -34,4 +34,18 @@ public class Tests
         var result = NameCleaner.CleanName("MUMMA_MIA!");
         Assert.That(result, Is.EqualTo("mummamia"));
     }
+    
+    [Test]
+    public void Test5()
+    {
+        var result = MovieBot.GetImdbId("MUMMA_MIA!");
+        Assert.That(result, Is.EqualTo(null));
+    }
+    
+    [Test]
+    public void Test6()
+    {
+        var result = MovieBot.GetImdbId("Something Something [tt1234567]");
+        Assert.That(result, Is.EqualTo("tt1234567"));
+    }
 }

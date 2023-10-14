@@ -1,9 +1,23 @@
 ﻿using System.Collections.Immutable;
 using System.Data.SQLite;
+using System.Text.RegularExpressions;
 using Dapper;
 
 public static class MovieBot
 {
+
+    private static Regex MatchImdbId = new Regex("\\[((.)+)\\]", RegexOptions.Compiled);
+    public static string GetImdbId(string name)
+    {
+        var match = MatchImdbId.Match(name);
+        if (match.Success)
+        {
+            return match.Groups[1].Value;
+        }
+
+        return null;
+    }
+    
     public static void Run(SQLiteConnection db, DirectoryInfo mediaPath)
     {
         // create a map of all the titles
@@ -54,6 +68,19 @@ public static class MovieBot
             if (!titleMap.TryGetValue(folderName, out var matchingTitles))
             {
                 Console.WriteLine($"Skipping {folder.Name} no match");
+                
+                var imdbId = GetImdbId(folder.Name);
+
+                if (string.IsNullOrWhiteSpace(imdbId))
+                {
+                    return;
+                }
+
+                matchingTitles = titleMap.Values.FirstOrDefault(v => v.Any(x => x.title_id == imdbId));
+            }
+            
+            if (matchingTitles == null)
+            {
                 return;
             }
 
