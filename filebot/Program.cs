@@ -50,6 +50,12 @@ void ProcessFolder(DirectoryInfo folder)
         Console.WriteLine($"Skipping {folder.Name} got imdbid in the name");
         return;
     }
+
+    if (folder.Name.Contains("DVD_VIDEO"))
+    {
+        Console.WriteLine($"Skipping {folder.Name} got DVD_VIDEO in the name");
+        return;
+    }
     
     // get the name of the folder
     var folderName = NameCleaner.CleanIncoming(folder.Name);

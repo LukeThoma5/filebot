@@ -20,4 +20,11 @@ public class Tests
         var result = NameCleaner.CleanName("THE_RING");
         Assert.That(result, Is.EqualTo("ring"));
     }
+    
+    [Test]
+    public void Test3()
+    {
+        var result = NameCleaner.CleanName("Marley & Me");
+        Assert.That(result, Is.EqualTo("marleyme"));
+    }
 }
