@@ -20,6 +20,16 @@ public class TvShowCommandLineOptions : CommandLineOptionsBase
     
 }
 
+[Verb("combine")]
+public class TvCombineCommandLineOptions : CommandLineOptionsBase
+{
+    [Option("prefix", Required = true, HelpText = "Common folder name")]
+    public string Prefix { get; set; }
+    
+    [Option("output", Required = true, HelpText = "Sub directory to output to")]
+    public string Output { get; set; }
+}
+
 
 public abstract class ParsedCommandLineOptionsBase
 {
@@ -37,11 +47,17 @@ public class ParsedTvShowCommandLineOptions : ParsedCommandLineOptionsBase
     
 }
 
+public class ParsedTvCombineCommandLineOptions : ParsedCommandLineOptionsBase
+{
+    public string Prefix { get; set; }
+    public string Output { get; set; }
+}
+
 public static class CliParser
 {
 public static ParsedCommandLineOptionsBase Parse(string[] args)
     {
-        var result = Parser.Default.ParseArguments<MovieCommandLineOptions, TvShowCommandLineOptions>(args);
+        var result = Parser.Default.ParseArguments<MovieCommandLineOptions, TvShowCommandLineOptions, TvCombineCommandLineOptions>(args);
         if (result.Tag == ParserResultType.NotParsed)
         {
             throw new Exception("Failed to parse command line options.");
@@ -52,10 +68,8 @@ public static ParsedCommandLineOptionsBase Parse(string[] args)
             var mediaPath = new DirectoryInfo(opts.MediaPath);
             return mediaPath;
         }
-        
-        
 
-        var parsed = result.MapResult<MovieCommandLineOptions, TvShowCommandLineOptions, ParsedCommandLineOptionsBase>((MovieCommandLineOptions opts) =>
+        var parsed = result.MapResult<MovieCommandLineOptions, TvShowCommandLineOptions, TvCombineCommandLineOptions, ParsedCommandLineOptionsBase>((MovieCommandLineOptions opts) =>
         {
             var dbPath = new FileInfo(opts.DbPath);
             if (!dbPath.Exists)
@@ -74,7 +88,15 @@ public static ParsedCommandLineOptionsBase Parse(string[] args)
             {
                 MediaPath = GetMediaPath(opts)
             };
-        }, errs => null)
+        }, (TvCombineCommandLineOptions opts) =>
+        {
+            return(ParsedCommandLineOptionsBase) new ParsedTvCombineCommandLineOptions
+            {
+                MediaPath = GetMediaPath(opts),
+                Output = opts.Output,
+                Prefix = opts.Prefix
+            };
+        },errs => null)
             ?? throw new Exception("failed to parse command line options");
         
 
