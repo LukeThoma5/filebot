@@ -23,7 +23,7 @@
                 var extraName = $"Extra S{seasonNumber:00} - {Guid.NewGuid():N}{file.Extension}";
                 newPath = Path.Combine(extrasFolder, extraName);
             }
-            else if (file.Length > 3000_000_000)
+            else if (file.Length > 15000_000_000)
             {
                 Console.WriteLine($"Skipping {file.FullName} file too big");
                 // Console.ReadLine();
