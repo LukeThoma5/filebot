@@ -33,4 +33,11 @@ switch (cliOptions)
         SeasonBot.Run(tvOptions.MediaPath);
         break;
     }
+    
+    case ParsedTvCombineCommandLineOptions tvOptions:
+    {
+        Console.WriteLine("Running tv show bot");
+        TvCombineBot.Run(tvOptions.MediaPath, tvOptions.Prefix, tvOptions.Output);
+        break;
+    }
 }
