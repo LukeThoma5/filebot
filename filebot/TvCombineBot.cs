@@ -37,7 +37,7 @@
             }
 
             Console.WriteLine($"Moving {file.FullName} to {newPath}");
-            // file.MoveTo(newPath);
+            file.MoveTo(newPath);
         }
 
     }
