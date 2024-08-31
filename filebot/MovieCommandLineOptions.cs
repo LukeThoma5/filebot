@@ -28,6 +28,12 @@ public class TvCombineCommandLineOptions : CommandLineOptionsBase
     
     [Option("output", Required = true, HelpText = "Sub directory to output to")]
     public string Output { get; set; }
+    
+    [Option("dry-run", Required = false, HelpText = "Dry Run", Default = false)]
+    public bool DryRun { get; set; }
+    
+    [Option("season", Required = false, HelpText = "Season", Default = 1)]
+    public int Season { get; set; }
 }
 
 
@@ -51,6 +57,8 @@ public class ParsedTvCombineCommandLineOptions : ParsedCommandLineOptionsBase
 {
     public string Prefix { get; set; }
     public string Output { get; set; }
+    public bool DryRun { get; set; }
+    public int Season { get; set; }
 }
 
 public static class CliParser
@@ -94,7 +102,9 @@ public static ParsedCommandLineOptionsBase Parse(string[] args)
             {
                 MediaPath = GetMediaPath(opts),
                 Output = opts.Output,
-                Prefix = opts.Prefix
+                Prefix = opts.Prefix,
+                Season = opts.Season,
+                DryRun = opts.DryRun
             };
         },errs => null)
             ?? throw new Exception("failed to parse command line options");

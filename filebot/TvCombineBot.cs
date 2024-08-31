@@ -10,15 +10,18 @@
 
         var seasonNumber = 1;
         var episodeNumber = 1;
-        foreach (var file in mediaPath.EnumerateDirectories()
-                     .Where(n => n.Name.StartsWith(prefix))
-                     .SelectMany(s => s.EnumerateFiles())
-                     .OrderBy(s => s.FullName)
-                )
+        var files = mediaPath.EnumerateDirectories()
+            .Where(n => n.Name.StartsWith(prefix))
+            .SelectMany(s => s.EnumerateFiles())
+            .OrderBy(s => s.FullName)
+            .ToArray();
+        var averageFileSize = files.Select(s => (int?)s.Length).Average();
+        var items = new List<Action>();
+        foreach (var file in files)
         {
 
             string newPath;
-            if (file.Length < 1000_000_000)
+            if (file.Length < averageFileSize / 3)
             {
                 var extraName = $"Extra S{seasonNumber:00} - {Guid.NewGuid():N}{file.Extension}";
                 newPath = Path.Combine(extrasFolder, extraName);
@@ -37,8 +40,20 @@
             }
 
             Console.WriteLine($"Moving {file.FullName} to {newPath}");
-            file.MoveTo(newPath);
+            items.Add(() => file.MoveTo(newPath));
+        }
+        
+        Console.WriteLine("Accept?:");
+        var result = Console.ReadLine();
+        if (result != "yes")
+        {
+            Console.WriteLine("Exiting");
+            return;
         }
 
+        foreach (var item in items)
+        {
+            item.Invoke();
+        }
     }
 }
