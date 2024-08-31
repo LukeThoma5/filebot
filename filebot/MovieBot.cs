@@ -61,6 +61,14 @@ public static class MovieBot
                 return;
             }
 
+            var limitUtc = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(3));
+
+            if (folder.EnumerateFiles().Any(f => f.LastWriteTimeUtc >= limitUtc))
+            {
+                // skip if still being written to.
+                return;
+            }
+
             // get the name of the folder
             var folderName = NameCleaner.CleanIncoming(folder.Name);
 
@@ -129,6 +137,13 @@ public static class MovieBot
 
             var newName = $"{title.primary_title} ({title.premiered}) [imdbid-{title.title_id}]";
             Console.WriteLine($"Renaming {folder.Name} to {newName}");
+            Console.Write("Accept (y)?: ");
+            var key = Console.ReadKey();
+            if (key.Key != ConsoleKey.Y)
+            {
+                return;
+            }
+            
             folder.MoveTo(Path.Combine(folder.Parent.FullName, newName));
 
             // locate the main movie file
