@@ -1,14 +1,19 @@
 ﻿public static class TvCombineBot
 {
-    public static void Run(DirectoryInfo mediaPath, string prefix, string output)
+    public static void Run(DirectoryInfo mediaPath, string prefix, string output, bool dryRun, int season)
     {
+        if (season < 1)
+        {
+            return;
+        }
+        
         var outputRoot = mediaPath.CreateSubdirectory(output);
         outputRoot.CreateSubdirectory("Season 00");
-        outputRoot.CreateSubdirectory("Season 01");
+        outputRoot.CreateSubdirectory($"Season {season:00}");
         var extrasFolder = Path.Combine(mediaPath.FullName, output, "Season 00");
-        var seasonFolder = Path.Combine(mediaPath.FullName, output, "Season 01");
+        var seasonFolder = Path.Combine(mediaPath.FullName, output, $"Season {season:00}");
 
-        var seasonNumber = 1;
+        var seasonNumber = season;
         var episodeNumber = 1;
         var files = mediaPath.EnumerateDirectories()
             .Where(n => n.Name.StartsWith(prefix))
@@ -45,7 +50,7 @@
         
         Console.WriteLine("Accept?:");
         var result = Console.ReadLine();
-        if (result != "yes")
+        if (result != "yes" || dryRun)
         {
             Console.WriteLine("Exiting");
             return;
