@@ -70,75 +70,109 @@ public static class MovieBot
             }
 
             // get the name of the folder
-            var folderName = NameCleaner.CleanIncoming(folder.Name);
+            var title = GetTitleFromSearch(folder.Name);
 
-            // if the folder name is in the map
-            if (!titleMap.TryGetValue(folderName, out var matchingTitles))
+            Title? GetTitleFromSearch(string search)
             {
-                Console.WriteLine($"Skipping {folder.Name} no match");
+                var folderName = NameCleaner.CleanIncoming(search);
+                // if the folder name is in the map
+                if (!titleMap.TryGetValue(folderName, out var matchingTitles))
+                {
+                    Console.WriteLine($"Skipping {folder.Name} no match");
                 
-                var imdbId = GetImdbId(folder.Name);
+                    var imdbId = GetImdbId(folder.Name);
 
-                if (string.IsNullOrWhiteSpace(imdbId))
+                    if (string.IsNullOrWhiteSpace(imdbId))
+                    {
+                        return null;
+                    }
+
+                    matchingTitles = titleMap.Values.FirstOrDefault(v => v.Any(x => x.title_id == imdbId));
+                }
+            
+                if (matchingTitles == null)
+                {
+                    return null;
+                }
+
+                Title title = null;
+
+                if (matchingTitles.Count == 1)
+                {
+                    title = matchingTitles.Single();
+                }
+                else
+                {
+                    while (true)
+                    {
+                        try
+                        {
+                            Console.WriteLine("Available options:");
+                            foreach (var (matchingTitle, index) in matchingTitles.Select((t, i) => (t, i)))
+                            {
+                                Console.WriteLine(
+                                    $"{index}) {matchingTitle.primary_title} ({matchingTitle.premiered}) [imdbid-{matchingTitle.title_id}]");
+                            }
+
+                            var line = Console.ReadLine();
+                            if (line == "next")
+                            {
+                                break;
+                            }
+
+                            var selectedIndex = int.Parse(line);
+                            title = matchingTitles[selectedIndex];
+                            if (title != null)
+                            {
+                                break;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                        }
+                    }
+                }
+
+                return title;
+            }
+
+            ConsoleKeyInfo key;
+
+            if (title == null)
+            {
+                Console.WriteLine("Would you like to search (s)?:");
+                key = Console.ReadKey();
+                if (key.Key != ConsoleKey.S)
                 {
                     return;
                 }
 
-                matchingTitles = titleMap.Values.FirstOrDefault(v => v.Any(x => x.title_id == imdbId));
-            }
-            
-            if (matchingTitles == null)
-            {
-                return;
+                title = SearchTitle();
             }
 
-            Title title = null;
-
-            if (matchingTitles.Count == 1)
-            {
-                title = matchingTitles.Single();
-            }
-            else
+            Title? SearchTitle()
             {
                 while (true)
                 {
-                    try
+                    Console.WriteLine("What would you like to search (next to skip): ");
+                    var text = Console.ReadLine();
+                    if (text == "next" || text is null)
                     {
-                        Console.WriteLine("Available options:");
-                        foreach (var (matchingTitle, index) in matchingTitles.Select((t, i) => (t, i)))
-                        {
-                            Console.WriteLine(
-                                $"{index}) {matchingTitle.primary_title} ({matchingTitle.premiered}) [imdbid-{matchingTitle.title_id}]");
-                        }
-
-                        var line = Console.ReadLine();
-                        if (line == "next")
-                        {
-                            break;
-                        }
-
-                        var selectedIndex = int.Parse(line);
-                        title = matchingTitles[selectedIndex];
-                        if (title != null)
-                        {
-                            break;
-                        }
+                        return null;
                     }
-                    catch (Exception ex)
+
+                    var possibleTitle = GetTitleFromSearch(text);
+                    if (possibleTitle != null)
                     {
+                        return possibleTitle;
                     }
                 }
-            }
-
-            if (title == null)
-            {
-                return;
             }
 
             var newName = $"{title.primary_title} ({title.premiered}) [imdbid-{title.title_id}]";
             Console.WriteLine($"Renaming {folder.Name} to {newName}");
             Console.Write("Accept (y)?: ");
-            var key = Console.ReadKey();
+            key = Console.ReadKey();
             if (key.Key != ConsoleKey.Y)
             {
                 return;
