@@ -17,6 +17,67 @@ public static class MovieBot
 
         return null;
     }
+
+    private static Title? ChooseTitle(IList<Title> matchingTitles)
+    {
+        Title? title = null;
+        while (true)
+        {
+            try
+            {
+                Console.WriteLine("Available options:");
+                foreach (var (matchingTitle, index) in matchingTitles.Select((t, i) => (t, i)))
+                {
+                    Console.WriteLine(
+                        $"{index}) {matchingTitle.primary_title} ({matchingTitle.premiered}) [imdbid-{matchingTitle.title_id}]");
+                }
+
+                var line = Console.ReadLine();
+                if (line == "next")
+                {
+                    break;
+                }
+
+                var selectedIndex = int.Parse(line);
+                title = matchingTitles[selectedIndex];
+                if (title != null)
+                {
+                    break;
+                }
+            }
+            catch (Exception ex)
+            {
+            }
+        }
+
+        return title;
+    }
+
+    private static Title? GetTitleFromFreeSearch(List<Title> titles)
+    {
+        while (true)
+        {
+            Console.WriteLine("What would you like to search (next to skip): ");
+            var text = Console.ReadLine();
+            if (text == "next" || text is null)
+            {
+                return null;
+            }
+
+            var search = NameCleaner.CleanName(text);
+
+            var possibleTitles = titles
+                .Where(t => NameCleaner.CleanName(t.primary_title).Contains(search, StringComparison.InvariantCultureIgnoreCase))
+                .ToArray();
+
+            if (!possibleTitles.Any())
+            {
+                continue;
+            }
+
+            return ChooseTitle(possibleTitles);
+        }
+    }
     
     public static void Run(SQLiteConnection db, DirectoryInfo mediaPath)
     {
@@ -70,9 +131,9 @@ public static class MovieBot
             }
 
             // get the name of the folder
-            var title = GetTitleFromSearch(folder.Name);
+            var title = GetTitleExact(folder.Name);
 
-            Title? GetTitleFromSearch(string search)
+            Title? GetTitleExact(string search)
             {
                 var folderName = NameCleaner.CleanIncoming(search);
                 // if the folder name is in the map
@@ -95,7 +156,7 @@ public static class MovieBot
                     return null;
                 }
 
-                Title title = null;
+                Title? title = null;
 
                 if (matchingTitles.Count == 1)
                 {
@@ -103,34 +164,7 @@ public static class MovieBot
                 }
                 else
                 {
-                    while (true)
-                    {
-                        try
-                        {
-                            Console.WriteLine("Available options:");
-                            foreach (var (matchingTitle, index) in matchingTitles.Select((t, i) => (t, i)))
-                            {
-                                Console.WriteLine(
-                                    $"{index}) {matchingTitle.primary_title} ({matchingTitle.premiered}) [imdbid-{matchingTitle.title_id}]");
-                            }
-
-                            var line = Console.ReadLine();
-                            if (line == "next")
-                            {
-                                break;
-                            }
-
-                            var selectedIndex = int.Parse(line);
-                            title = matchingTitles[selectedIndex];
-                            if (title != null)
-                            {
-                                break;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                        }
-                    }
+                    title = ChooseTitle(matchingTitles);
                 }
 
                 return title;
@@ -147,27 +181,10 @@ public static class MovieBot
                     return;
                 }
 
-                title = SearchTitle();
+                title = GetTitleFromFreeSearch(titles);
             }
 
-            Title? SearchTitle()
-            {
-                while (true)
-                {
-                    Console.WriteLine("What would you like to search (next to skip): ");
-                    var text = Console.ReadLine();
-                    if (text == "next" || text is null)
-                    {
-                        return null;
-                    }
 
-                    var possibleTitle = GetTitleFromSearch(text);
-                    if (possibleTitle != null)
-                    {
-                        return possibleTitle;
-                    }
-                }
-            }
 
             var newName = $"{title.primary_title} ({title.premiered}) [imdbid-{title.title_id}]";
             Console.WriteLine($"Renaming {folder.Name} to {newName}");
