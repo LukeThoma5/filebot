@@ -9,8 +9,6 @@ public abstract class CommandLineOptionsBase
 [Verb("movies", HelpText = "Run the movie bot.")]
 public class MovieCommandLineOptions : CommandLineOptionsBase
 {
-    [Option("db-path", Required = true, HelpText = "Path to the database file.")]
-    public string DbPath { get; set; }
 }
 
 
@@ -44,7 +42,7 @@ public abstract class ParsedCommandLineOptionsBase
 
 public class ParsedMovieCommandLineOptions : ParsedCommandLineOptionsBase
 {
-    public FileInfo DbPath { get; set; }
+    
 }
 
 
@@ -79,15 +77,8 @@ public static ParsedCommandLineOptionsBase Parse(string[] args)
 
         var parsed = result.MapResult<MovieCommandLineOptions, TvShowCommandLineOptions, TvCombineCommandLineOptions, ParsedCommandLineOptionsBase>((MovieCommandLineOptions opts) =>
         {
-            var dbPath = new FileInfo(opts.DbPath);
-            if (!dbPath.Exists)
-            {
-                throw new Exception("Database file does not exist.");
-            }
-
             return(ParsedCommandLineOptionsBase) new ParsedMovieCommandLineOptions
             {
-                DbPath = dbPath,
                 MediaPath = GetMediaPath(opts)
             };
         }, (TvShowCommandLineOptions opts) =>

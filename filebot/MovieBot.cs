@@ -1,12 +1,19 @@
-﻿using System.Collections.Immutable;
-using System.Data.SQLite;
-using System.Text.RegularExpressions;
-using Dapper;
+﻿using System.Text.RegularExpressions;
+using Spectre.Console;
+using TMDbLib.Client;
+using TMDbLib.Objects.Search;
 
-public static class MovieBot
+public class MovieBot
 {
 
+    private readonly TMDbClient _client;
     private static Regex MatchImdbId = new Regex("\\[((.)+)\\]", RegexOptions.Compiled);
+
+    public MovieBot(TMDbClient client)
+    {
+        _client = client;
+    }
+
     public static string GetImdbId(string name)
     {
         var match = MatchImdbId.Match(name);
@@ -17,216 +24,206 @@ public static class MovieBot
 
         return null;
     }
+ 
 
-    private static Title? ChooseTitle(IList<Title> matchingTitles)
+    private IEnumerable<DirectoryInfo> GetRemainingDirectories(DirectoryInfo mediaPath)
     {
-        Title? title = null;
-        while (true)
+        foreach (var folder in mediaPath.EnumerateDirectories())
         {
-            try
-            {
-                Console.WriteLine("Available options:");
-                foreach (var (matchingTitle, index) in matchingTitles.Select((t, i) => (t, i)))
-                {
-                    Console.WriteLine(
-                        $"{index}) {matchingTitle.primary_title} ({matchingTitle.premiered}) [imdbid-{matchingTitle.title_id}]");
-                }
-
-                var line = Console.ReadLine();
-                if (line == "next")
-                {
-                    break;
-                }
-
-                var selectedIndex = int.Parse(line);
-                title = matchingTitles[selectedIndex];
-                if (title != null)
-                {
-                    break;
-                }
-            }
-            catch (Exception ex)
-            {
-            }
-        }
-
-        return title;
-    }
-
-    private static Title? GetTitleFromFreeSearch(List<Title> titles)
-    {
-        while (true)
-        {
-            Console.WriteLine("What would you like to search (next to skip): ");
-            var text = Console.ReadLine();
-            if (text == "next" || text is null)
-            {
-                return null;
-            }
-
-            var search = NameCleaner.CleanName(text);
-
-            var possibleTitles = titles
-                .Where(t => NameCleaner.CleanName(t.primary_title).Contains(search, StringComparison.InvariantCultureIgnoreCase))
-                .ToArray();
-
-            if (!possibleTitles.Any())
+            if (folder.Name.Contains("imdbid"))
             {
                 continue;
             }
-
-            return ChooseTitle(possibleTitles);
-        }
-    }
-    
-    public static void Run(SQLiteConnection db, DirectoryInfo mediaPath)
-    {
-        // create a map of all the titles
-        var sql = "select title_id, primary_title, premiered  from titles where type='movie'";
-
-        // execute the query with dapper
-        var titles = db.Query<Title>(sql).Where(t => t.primary_title != null).ToList();
-
-        var titleMap = titles.Select(t => (NameCleaner.CleanName(t.primary_title), Title: t))
-            .GroupBy(t => t.Item1)
-            .ToImmutableDictionary(t => t.Key, t => t.Select(x => x.Item2).ToList());
-        Console.WriteLine("Done");
-
-        // for each folder in the media folder
-
-
-        foreach (var folder in mediaPath.EnumerateDirectories())
-        {
-            try
-            {
-                ProcessFolder(folder);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Failed to process folder {folder.Name} {ex}");
-            }
-        }
-
-        void ProcessFolder(DirectoryInfo folder)
-        {
-            Console.WriteLine("Trying folder: " + folder.Name);
-            if (folder.Name.Contains("imdbid"))
-            {
-                Console.WriteLine($"Skipping {folder.Name} got imdbid in the name");
-                return;
-            }
-
-            if (folder.Name.Contains("DVD_VIDEO"))
-            {
-                Console.WriteLine($"Skipping {folder.Name} got DVD_VIDEO in the name");
-                return;
-            }
-
+            
             var limitUtc = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(3));
 
             if (folder.EnumerateFiles().Any(f => f.LastWriteTimeUtc >= limitUtc))
             {
                 // skip if still being written to.
-                return;
+                continue;
             }
 
-            // get the name of the folder
-            var title = GetTitleExact(folder.Name);
-
-            Title? GetTitleExact(string search)
+            if (!folder.EnumerateFiles().Any())
             {
-                var folderName = NameCleaner.CleanIncoming(search);
-                // if the folder name is in the map
-                if (!titleMap.TryGetValue(folderName, out var matchingTitles))
-                {
-                    Console.WriteLine($"Skipping {folder.Name} no match");
-                
-                    var imdbId = GetImdbId(folder.Name);
+                // skip empty folders
+                continue;
+            }
 
-                    if (string.IsNullOrWhiteSpace(imdbId))
-                    {
-                        return null;
-                    }
+            yield return folder;
+        }
+    }
 
-                    matchingTitles = titleMap.Values.FirstOrDefault(v => v.Any(x => x.title_id == imdbId));
-                }
+    private PromptResult<DirectoryInfo> GetFolderChoice(DirectoryInfo[] directories)
+    {
+        var selection = new SelectionPrompt<PromptResult<DirectoryInfo>>()
+            .Title("Which folder do you want to process?")
+            .PageSize(10)
+            .EnableSearch()
+            .AddChoices(AsPromptResult(directories))
+            .AddChoices(PromptResult<DirectoryInfo>.ExitResult)
+            .UseConverter(d => d.Display(dir => dir.Name))
+            ;
+        var dir = AnsiConsole.Prompt(
+            selection
+        );
+
+        return dir;
+    }
+
+    private static IEnumerable<PromptResult<T>> AsPromptResult<T>(IEnumerable<T> items)
+        => items.Select(d => new PromptResult<T>.Selection(d));
+
+    private async Task<PromptResult<SearchMovie>> SearchMovieAsync(string query)
+    {
+        var movies = new List<SearchMovie>();
+        var maxMovies = 100;
+        var pageNumber = 1;
+        var hasMore = true;
+        do
+        {
+            var potentialMovies = await _client.SearchMovieAsync(query, page: pageNumber);
+            movies.AddRange(potentialMovies.Results);
+            hasMore = pageNumber < potentialMovies.TotalPages && movies.Count < maxMovies;
+            pageNumber += 1;
+        } while (hasMore);
+        
+        var selection = new SelectionPrompt<PromptResult<SearchMovie>>()
+            .Title("Which movie is it?")
+            .PageSize(10)
+            .EnableSearch()
+            .UseConverter(d => d.Display(mov => $"{mov.Title} ({mov.ReleaseDate:yyyy}) ({mov.Popularity})"))
+            .AddChoices(AsPromptResult(movies))
+            .AddChoices(new PromptResult<SearchMovie>.Manual())
+            .AddChoices(PromptResult<SearchMovie>.ExitResult);
+
+        
+        var mov = AnsiConsole.Prompt(
+            selection
+        );
+
+        return mov;
+    }
+
+    private bool GetConfirmation(string prompt)
+    {
+        var confirmation = AnsiConsole.Prompt(
+            new TextPrompt<bool>(prompt)
+                .AddChoice(true)
+                .AddChoice(false)
+                .DefaultValue(true)
+                .WithConverter(choice => choice ? "y" : "n"));
+
+        return confirmation;
+    }
+
+    private async Task ApplyMovieAsync(DirectoryInfo folder, SearchMovie searchMovie)
+    {
+        var movie = await _client.GetMovieAsync(searchMovie.Id);
+        var newName = $"{movie.Title} ({movie.ReleaseDate:yyyy}) [imdbid-{movie.ImdbId}]";
+        AnsiConsole.WriteLine($"Renaming {folder.Name} to {newName}");
+        var accepted = GetConfirmation("Accept?");
+        if (!accepted)
+        {
+            return;
+        }
             
-                if (matchingTitles == null)
-                {
-                    return null;
-                }
+        folder.MoveTo(Path.Combine(folder.Parent.FullName, newName));
 
-                Title? title = null;
+        // locate the main movie file
+        var mainMovieFile = folder.EnumerateFiles()
+            .OrderByDescending(f => f.Length)
+            .FirstOrDefault(f => f.Extension is ".mkv" or ".mp4");
 
-                if (matchingTitles.Count == 1)
-                {
-                    title = matchingTitles.Single();
-                }
-                else
-                {
-                    title = ChooseTitle(matchingTitles);
-                }
+        if (mainMovieFile == null)
+        {
+            return;
+        }
 
-                return title;
+        // rename the main movie file
+        var newMovieName =
+            $"{movie.Title} ({movie.ReleaseDate:yyyy}) [imdbid-{movie.ImdbId}]{mainMovieFile.Extension}";
+        AnsiConsole.WriteLine($"Renaming {mainMovieFile.Name} to {newMovieName}");
+        mainMovieFile.MoveTo(Path.Combine(folder.FullName, newMovieName));
+
+        // create a folder called extras
+        try
+        {
+            var extrasFolder = folder.CreateSubdirectory("extras");
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.WriteException(ex);
+        }
+
+        // move all files but the main movie file into extras
+        foreach (var file in folder.EnumerateFiles().Where(f => f.Name != mainMovieFile.Name))
+        {
+            AnsiConsole.WriteLine($"Moving {file.Name} to extras");
+            file.MoveTo(Path.Combine(folder.FullName, "extras", file.Name));
+        }
+    }
+    
+    public async Task RunAsync(DirectoryInfo mediaPath)
+    {
+        while (true)
+        {
+            var options = GetRemainingDirectories(mediaPath).ToArray();
+            if (!options.Any())
+            {
+                return;
             }
 
-            ConsoleKeyInfo key;
+            var folderChoice = GetFolderChoice(options);
 
-            if (title == null)
+            if (folderChoice is not PromptResult<DirectoryInfo>.Selection folder)
             {
-                Console.WriteLine("Would you like to search (s)?:");
-                key = Console.ReadKey();
-                if (key.Key != ConsoleKey.S)
-                {
-                    return;
-                }
-
-                title = GetTitleFromFreeSearch(titles);
-            }
-
-
-
-            var newName = $"{title.primary_title} ({title.premiered}) [imdbid-{title.title_id}]";
-            Console.WriteLine($"Renaming {folder.Name} to {newName}");
-            Console.Write("Accept (y)?: ");
-            key = Console.ReadKey();
-            if (key.Key != ConsoleKey.Y)
-            {
+                // choose to exit
                 return;
             }
             
-            folder.MoveTo(Path.Combine(folder.Parent.FullName, newName));
-
-            // locate the main movie file
-            var mainMovieFile = folder.EnumerateFiles()
-                .OrderByDescending(f => f.Length)
-                .FirstOrDefault(f => f.Extension == ".mkv" || f.Extension == ".mp4");
-
-            if (mainMovieFile == null)
-            {
-                return;
-            }
-
-            // rename the main movie file
-            var newMovieName =
-                $"{title.primary_title} ({title.premiered}) [imdbid-{title.title_id}]{mainMovieFile.Extension}";
-            Console.WriteLine($"Renaming {mainMovieFile.Name} to {newMovieName}");
-            mainMovieFile.MoveTo(Path.Combine(folder.FullName, newMovieName));
-
-            // create a folder called extras
             try
             {
-                var extrasFolder = folder.CreateSubdirectory("extras");
+                await ProcessFolderAsync(folder.Item);
             }
-            catch
+            catch (Exception e)
             {
+                AnsiConsole.WriteException(e);
+            }
+        }
+    }
+
+    private async Task ProcessFolderAsync(DirectoryInfo folder)
+    {
+        AnsiConsole.WriteLine("Trying folder: " + folder.Name);
+
+        // get the name of the folder
+        var name = NameCleaner.CleanIncoming(folder.Name)
+                   ?? throw new Exception("Name not set");
+
+        while (true)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                // exit because no name entered
+                return;
+            }
+                
+            var movieResult = await SearchMovieAsync(name);
+
+            if (movieResult is PromptResult<SearchMovie>.Selection movieSelection)
+            {
+                await ApplyMovieAsync(folder, movieSelection.Item);
+                return;
             }
 
-            // move all files but the main movie file into extras
-            foreach (var file in folder.EnumerateFiles().Where(f => f.Name != mainMovieFile.Name))
+            if (movieResult is PromptResult<SearchMovie>.Exit)
             {
-                Console.WriteLine($"Moving {file.Name} to extras");
-                file.MoveTo(Path.Combine(folder.FullName, "extras", file.Name));
+                return;
+            }
+
+            if (movieResult is PromptResult<SearchMovie>.Manual)
+            {
+                name = AnsiConsole.Ask("What do you want to search for?", "");
             }
         }
     }

@@ -1,11 +1,10 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
-using System.Collections.Immutable;
-using CommandLine;
-using System.Data.SQLite;
-using Dapper;
+using Microsoft.Extensions.Configuration;
+using Spectre.Console;
+using TMDbLib.Client;
 
-Console.WriteLine("Hello, World!");
+AnsiConsole.Clear();
 
 var cliOptions = CliParser.Parse(args);
 
@@ -16,14 +15,18 @@ switch (cliOptions)
 {
     case ParsedMovieCommandLineOptions movieOptions:
     {
-        Console.WriteLine("Running movie bot");
-        Console.WriteLine($"Database path: {movieOptions.DbPath.FullName}");
+        AnsiConsole.WriteLine("Running movie bot");
+        
+        var builder = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("appsettings.json", optional: false);
 
-// open the db with dapper
-        using var db = new SQLiteConnection($"Data Source={movieOptions.DbPath.FullName}");
-        db.Open();
+        IConfiguration config = builder.Build();
 
-        MovieBot.Run(db, movieOptions.MediaPath);
+        var client = new TMDbClient(config["TMDBAPI"]);
+
+        var movieBot = new MovieBot(client);
+        await movieBot.RunAsync(movieOptions.MediaPath);
         break;
     }
 
@@ -41,3 +44,4 @@ switch (cliOptions)
         break;
     }
 }
+
