@@ -43,5 +43,12 @@ switch (cliOptions)
         TvCombineBot.Run(tvOptions.MediaPath, tvOptions.Prefix, tvOptions.Output, tvOptions.DryRun, tvOptions.Season);
         break;
     }
+    
+    case ParsedCleanupCommandLineOptions tvOptions:
+    {
+        Console.WriteLine("Running Cleanup");
+        CleanupBot.Run(tvOptions.MediaPath);
+        break;
+    }
 }
 

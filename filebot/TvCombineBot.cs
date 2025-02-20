@@ -1,5 +1,16 @@
 ﻿public static class TvCombineBot
 {
+    private static string RandIdentifier()  {
+        while (true)
+        {
+            var guid = Guid.NewGuid();
+            var str = guid.ToString("N");
+            if (!str.StartsWith("e"))
+            {
+                return str;
+            }
+        }
+    }
     public static void Run(DirectoryInfo mediaPath, string prefix, string output, bool dryRun, int season)
     {
         if (season < 1)
@@ -21,17 +32,18 @@
             .OrderBy(s => s.FullName)
             .ToArray();
         var averageFileSize = files.Select(s => (int?)s.Length).Average();
+        double? minTitleSize = 1_000_000_000.0;
         var items = new List<Action>();
         foreach (var file in files)
         {
 
             string newPath;
-            if (file.Length < averageFileSize / 3)
+            if (file.Length < averageFileSize / 3 || minTitleSize.HasValue && file.Length < minTitleSize)
             {
-                var extraName = $"Extra S{seasonNumber:00} - {Guid.NewGuid():N}{file.Extension}";
+                var extraName = $"Extra S{seasonNumber:00} - {RandIdentifier()}{file.Extension}";
                 newPath = Path.Combine(extrasFolder, extraName);
             }
-            else if (file.Length > 15000_000_000)
+            else if (file.Length > 30_000_000_000)
             {
                 Console.WriteLine($"Skipping {file.FullName} file too big");
                 // Console.ReadLine();

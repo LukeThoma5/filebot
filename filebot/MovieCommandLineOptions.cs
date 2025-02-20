@@ -18,6 +18,12 @@ public class TvShowCommandLineOptions : CommandLineOptionsBase
     
 }
 
+[Verb("cleanup")]
+public class CleanupCommandLineOptions : CommandLineOptionsBase
+{
+    
+}
+
 [Verb("combine")]
 public class TvCombineCommandLineOptions : CommandLineOptionsBase
 {
@@ -51,6 +57,11 @@ public class ParsedTvShowCommandLineOptions : ParsedCommandLineOptionsBase
     
 }
 
+public class ParsedCleanupCommandLineOptions : ParsedCommandLineOptionsBase
+{
+    
+}
+
 public class ParsedTvCombineCommandLineOptions : ParsedCommandLineOptionsBase
 {
     public string Prefix { get; set; }
@@ -63,7 +74,7 @@ public static class CliParser
 {
 public static ParsedCommandLineOptionsBase Parse(string[] args)
     {
-        var result = Parser.Default.ParseArguments<MovieCommandLineOptions, TvShowCommandLineOptions, TvCombineCommandLineOptions>(args);
+        var result = Parser.Default.ParseArguments<MovieCommandLineOptions, TvShowCommandLineOptions, TvCombineCommandLineOptions, CleanupCommandLineOptions>(args);
         if (result.Tag == ParserResultType.NotParsed)
         {
             throw new Exception("Failed to parse command line options.");
@@ -75,7 +86,10 @@ public static ParsedCommandLineOptionsBase Parse(string[] args)
             return mediaPath;
         }
 
-        var parsed = result.MapResult<MovieCommandLineOptions, TvShowCommandLineOptions, TvCombineCommandLineOptions, ParsedCommandLineOptionsBase>((MovieCommandLineOptions opts) =>
+        var parsed = result.MapResult<MovieCommandLineOptions,
+                         TvShowCommandLineOptions, TvCombineCommandLineOptions,
+                         CleanupCommandLineOptions,
+                         ParsedCommandLineOptionsBase>((MovieCommandLineOptions opts) =>
         {
             return(ParsedCommandLineOptionsBase) new ParsedMovieCommandLineOptions
             {
@@ -97,7 +111,15 @@ public static ParsedCommandLineOptionsBase Parse(string[] args)
                 Season = opts.Season,
                 DryRun = opts.DryRun
             };
-        },errs => null)
+        },(CleanupCommandLineOptions opts) =>
+        {
+            return(ParsedCommandLineOptionsBase) new ParsedCleanupCommandLineOptions
+            {
+                MediaPath = GetMediaPath(opts)
+            };
+        },
+                         
+                         errs => null)
             ?? throw new Exception("failed to parse command line options");
         
 
